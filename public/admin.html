@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Console - UBI Central</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="navbar">
+    <a class="nav-logo" href="/">UBI Central</a>
+    <nav class="nav-links">
+      <a href="/">Auth</a>
+      <a href="/bio.html">Profile</a>
+      <a href="/admin.html">Admin</a>
+    </nav>
+    <div id="nav-user" class="nav-user"></div>
+  </header>
+  <main class="page">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Operations</p>
+        <h1>Admin console</h1>
+        <p class="lede">Inspect every user currently stored in the C++ transfer service and track their activity at a glance.</p>
+        <div class="cta-row">
+          <a class="button secondary" href="/">Back to auth playground</a>
+          <button class="button ghost" id="refresh-btn" type="button">Refresh users</button>
+        </div>
+      </div>
+      <div class="card quick-stats">
+        <p class="label">Overview</p>
+        <div class="stat">
+          <span class="stat-label">Total users</span>
+          <span id="total-users" class="stat-value">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Active (has transfers)</span>
+          <span id="active-users" class="stat-value">0</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="table-header">
+        <div>
+          <h2>Registered users</h2>
+          <p class="muted small">Data is fetched directly from the C++ backend via /api/admin/users.</p>
+        </div>
+        <span class="badge muted" id="last-sync">Last sync: never</span>
+      </div>
+      <div class="table-scroll" id="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Status</th>
+              <th>Inbound</th>
+              <th>Outbound</th>
+              <th>Totals</th>
+            </tr>
+          </thead>
+          <tbody id="user-table-body"></tbody>
+        </table>
+      </div>
+      <p id="empty-state" class="muted small hidden">No users recorded in the C++ store yet.</p>
+    </section>
+
+    <p id="status" class="status muted small">Waiting to load admin data…</p>
+  </main>
+  <script src="nav.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

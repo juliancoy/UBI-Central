@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - UBI Central</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .policy {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 32px 18px 80px;
+      color: var(--text);
+    }
+    .policy h1 {
+      margin: 0 0 10px;
+    }
+    .policy section {
+      margin-top: 22px;
+    }
+    .policy h2 {
+      margin: 0 0 8px;
+    }
+    .policy p {
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .pill {
+      display: inline-block;
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 12px;
+      color: var(--muted);
+      font-size: 13px;
+      margin-right: 8px;
+    }
+    a {
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <main class="policy">
+    <p class="pill">Last updated: February 2025</p>
+    <h1>Privacy Policy</h1>
+    <p class="lede">This policy explains how UBI Central handles account data, including data received from Google and GitHub sign-in.</p>
+
+    <section>
+      <h2>What we collect</h2>
+      <p>- Email address and name when you sign up locally, with Google Sign-In, or with GitHub.</p>
+      <p>- Passwords for local accounts are stored only as bcrypt password hashes.</p>
+      <p>- Authentication tokens (JWT access and refresh tokens) are generated to keep you signed in.</p>
+    </section>
+
+    <section>
+      <h2>How we use data</h2>
+      <p>- To create and authenticate your account, and to keep your session active via access/refresh tokens.</p>
+      <p>- To provide the features you choose (login, profile, logout). We do not use your data for advertising or resale.</p>
+    </section>
+
+    <section>
+      <h2>Google API Services compliance</h2>
+      <p>- Google data requested: basic profile and email via Google Sign-In (no other Google scopes).</p>
+      <p>- Use: to create or sign you in and display your profile. No secondary uses, no sale, and no sharing with third parties beyond what is needed to operate authentication.</p>
+      <p>- Storage: email and name are stored in our user record; refresh tokens issued by this app are stored to manage sessions. Google OAuth tokens are not reused beyond sign-in.</p>
+      <p>- Access limits: we request only the minimum scopes and do not permit human access except as required by law, security, or debugging with your consent.</p>
+      <p>- You can revoke Google access anytime via your Google Account permissions or by contacting us.</p>
+      <p>For more detail, review the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">Google API Services User Data Policy</a>.</p>
+    </section>
+
+    <section>
+      <h2>GitHub sign-in</h2>
+      <p>- GitHub data requested: email and basic profile (via user:email scope).</p>
+      <p>- Use: to create or sign you in and display your profile. No other processing, no advertising, no resale.</p>
+      <p>- You can revoke GitHub access in your GitHub account settings.</p>
+    </section>
+
+    <section>
+      <h2>Sharing</h2>
+      <p>- We do not sell or rent personal data.</p>
+      <p>- We may share data only to comply with law, enforce terms, or protect users or the service.</p>
+    </section>
+
+    <section>
+      <h2>Security</h2>
+      <p>- Passwords are hashed with bcrypt.</p>
+      <p>- Tokens are signed with app secrets; refresh tokens rotate on use.</p>
+      <p>- Data is transmitted over HTTPS in production. Use HTTPS when deploying.</p>
+    </section>
+
+    <section>
+      <h2>Data retention and deletion</h2>
+      <p>- User records persist while the account exists.</p>
+      <p>- You may request deletion of your account and associated data by contacting us.</p>
+    </section>
+
+    <section>
+      <h2>Children</h2>
+      <p>- The service is not directed to children under 13, and we do not knowingly collect data from them.</p>
+    </section>
+
+    <section>
+      <h2>Contact</h2>
+      <p>For questions or requests (access, correction, deletion, or revocation of OAuth consent), email: privacy@example.com.</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UBI Central Auth Demo</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="login-modal" class="modal hidden">
+    <div class="modal-backdrop" id="modal-backdrop"></div>
+    <div class="modal-card">
+      <button class="modal-close" id="modal-close" aria-label="Close modal">×</button>
+      <p class="label">Single Sign-On</p>
+      <h2>Choose a provider</h2>
+      <div class="provider-row">
+        <a class="provider-btn google" href="/auth/google">
+          <span class="icon" aria-hidden="true">G</span>
+          <span>Continue with Google</span>
+        </a>
+        <a class="provider-btn github" href="/auth/github">
+          <span class="icon" aria-hidden="true">GH</span>
+          <span>Continue with GitHub</span>
+        </a>
+      </div>
+      <p class="muted small">You can also sign up with email/password below on the page.</p>
+    </div>
+  </div>
+  <header class="navbar">
+    <a class="nav-logo" href="/">UBI Central</a>
+    <nav class="nav-links">
+      <a href="/">Auth</a>
+      <a href="/bio.html">Profile</a>
+      <a href="/admin.html">Admin</a>
+    </nav>
+    <div id="nav-user" class="nav-user"></div>
+  </header>
+  <main class="page">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Token-based authentication</p>
+        <h1>UBI Central Auth Playground</h1>
+        <p class="lede">Register, login, refresh JWTs, and try Google or GitHub social sign-in from one simple page.</p>
+        <div class="cta-row">
+          <a class="button primary" id="google-btn" href="/auth/google">Continue with Google</a>
+          <a class="button secondary" id="github-btn" href="/auth/github">Continue with GitHub</a>
+          <button class="button ghost" id="refresh-btn" type="button">Refresh Access Token</button>
+          <a class="button ghost" href="/admin.html">Admin console</a>
+        </div>
+      </div>
+      <div class="card quick-stats">
+        <p class="label">Current session</p>
+        <div class="stat">
+          <span class="stat-label">Access token</span>
+          <span id="access-state" class="stat-value muted">none</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Refresh token</span>
+          <span id="refresh-state" class="stat-value muted">none</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="grid">
+      <div class="card">
+        <h2>Create account</h2>
+        <form id="register-form" class="form">
+          <label>
+            Name
+            <input type="text" name="name" required placeholder="Casey Developer">
+          </label>
+          <label>
+            Email
+            <input type="email" name="email" required placeholder="casey@example.com">
+          </label>
+          <label>
+            Password
+            <input type="password" name="password" required placeholder="••••••••">
+          </label>
+          <button class="button primary" type="submit">Register &amp; sign in</button>
+        </form>
+      </div>
+
+      <div class="card" id="login-card">
+        <h2>Login</h2>
+        <form id="login-form" class="form">
+          <label>
+            Email
+            <input type="email" name="email" required placeholder="casey@example.com">
+          </label>
+          <label>
+            Password
+            <input type="password" name="password" required placeholder="••••••••">
+          </label>
+          <button class="button secondary" type="submit">Login</button>
+        </form>
+        <button class="button ghost full" id="logout-btn" type="button">Logout</button>
+      </div>
+
+      <div class="card">
+        <h2>Profile</h2>
+        <p class="muted small">Fetches using the access token (Authorization: Bearer).</p>
+        <button class="button secondary" id="me-btn" type="button">Get /api/auth/me</button>
+        <pre id="profile-output" class="output">No data yet.</pre>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Latest event</h2>
+      <p id="status" class="status muted">Waiting for your first action.</p>
+    </section>
+  </main>
+  <script src="nav.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

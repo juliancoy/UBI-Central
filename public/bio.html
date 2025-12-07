@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile - UBI Central</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="navbar">
+    <a class="nav-logo" href="/">UBI Central</a>
+    <nav class="nav-links">
+      <a href="/">Auth</a>
+      <a href="/bio.html">Profile</a>
+      <a href="/admin.html">Admin</a>
+    </nav>
+    <div id="nav-user" class="nav-user"></div>
+  </header>
+  <main class="page">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Account</p>
+        <h1>Your profile</h1>
+        <p class="lede">Fetched from the authenticated /api/auth/me endpoint using your access token.</p>
+        <div class="cta-row">
+          <a class="button secondary" href="/">Back to auth playground</a>
+          <button class="button ghost" id="logout-btn" type="button">Logout</button>
+        </div>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2>Bio</h2>
+      <pre id="profile-output" class="output">Loading...</pre>
+      <p id="status" class="muted small">Requesting profile…</p>
+    </section>
+  </main>
+  <script src="nav.js"></script>
+  <script src="bio.js"></script>
+</body>
+</html>
