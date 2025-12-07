@@ -10,6 +10,9 @@ const lastSync = document.getElementById('last-sync');
 const refreshBtn = document.getElementById('refresh-btn');
 const totalUsersEl = document.getElementById('total-users');
 const activeUsersEl = document.getElementById('active-users');
+const grantInput = document.getElementById('grant-amount');
+const grantBtn = document.getElementById('grant-btn');
+const grantStatus = document.getElementById('grant-status');
 
 function syncTokens(detail = {}) {
   state.accessToken = detail.accessToken || localStorage.getItem('accessToken') || '';
@@ -70,6 +73,8 @@ function renderUsers(users) {
 
   users.forEach((user) => {
     const row = document.createElement('tr');
+    row.classList.add('clickable-row');
+    row.tabIndex = 0;
     const badgeClass = user.status === 'active' ? 'success' : 'muted';
     row.innerHTML = `
       <td>
@@ -95,6 +100,16 @@ function renderUsers(users) {
         <div class="muted small">Net</div>
       </td>
     `;
+    const openAccount = () => {
+      window.location.href = `/account.html?email=${encodeURIComponent(user.email)}`;
+    };
+    row.addEventListener('click', openAccount);
+    row.addEventListener('keypress', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openAccount();
+      }
+    });
     tableBody.appendChild(row);
   });
 }
@@ -123,6 +138,34 @@ async function loadUsers() {
 }
 
 refreshBtn?.addEventListener('click', loadUsers);
+
+grantBtn?.addEventListener('click', async () => {
+  if (!state.accessToken) {
+    grantStatus.textContent = 'Login required';
+    grantStatus.style.color = 'var(--danger)';
+    return;
+  }
+  const amount = Number(grantInput?.value || 0);
+  if (!amount || Number.isNaN(amount)) {
+    grantStatus.textContent = 'Enter an amount';
+    grantStatus.style.color = 'var(--danger)';
+    return;
+  }
+  grantStatus.textContent = 'Applying grant...';
+  grantStatus.style.color = 'var(--muted)';
+  try {
+    await api('/api/admin/grant', {
+      method: 'POST',
+      body: JSON.stringify({ amount }),
+    });
+    grantStatus.textContent = `Granted ${amount} to all users`;
+    grantStatus.style.color = 'var(--accent)';
+    loadUsers();
+  } catch (err) {
+    grantStatus.textContent = err.message;
+    grantStatus.style.color = 'var(--danger)';
+  }
+});
 
 document.addEventListener('auth:tokens-changed', (event) => {
   syncTokens(event.detail || {});

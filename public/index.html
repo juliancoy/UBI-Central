@@ -7,30 +7,11 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="login-modal" class="modal hidden">
-    <div class="modal-backdrop" id="modal-backdrop"></div>
-    <div class="modal-card">
-      <button class="modal-close" id="modal-close" aria-label="Close modal">×</button>
-      <p class="label">Single Sign-On</p>
-      <h2>Choose a provider</h2>
-      <div class="provider-row">
-        <a class="provider-btn google" href="/auth/google">
-          <span class="icon" aria-hidden="true">G</span>
-          <span>Continue with Google</span>
-        </a>
-        <a class="provider-btn github" href="/auth/github">
-          <span class="icon" aria-hidden="true">GH</span>
-          <span>Continue with GitHub</span>
-        </a>
-      </div>
-      <p class="muted small">You can also sign up with email/password below on the page.</p>
-    </div>
-  </div>
   <header class="navbar">
     <a class="nav-logo" href="/">UBI Central</a>
     <nav class="nav-links">
-      <a href="/">Auth</a>
-      <a href="/bio.html">Profile</a>
+      <a href="/">Home</a>
+      <a href="/invoice.html">Invoices</a>
       <a href="/admin.html">Admin</a>
     </nav>
     <div id="nav-user" class="nav-user"></div>
@@ -38,14 +19,13 @@
   <main class="page">
     <header class="hero">
       <div>
-        <p class="eyebrow">Token-based authentication</p>
-        <h1>UBI Central Auth Playground</h1>
-        <p class="lede">Register, login, refresh JWTs, and try Google or GitHub social sign-in from one simple page.</p>
+        <p class="eyebrow">Wallet</p>
+        <h1>Your UBI console</h1>
+        <p class="lede">Sign in, view your balance, and move funds. Quick actions below.</p>
         <div class="cta-row">
-          <a class="button primary" id="google-btn" href="/auth/google">Continue with Google</a>
-          <a class="button secondary" id="github-btn" href="/auth/github">Continue with GitHub</a>
-          <button class="button ghost" id="refresh-btn" type="button">Refresh Access Token</button>
-          <a class="button ghost" href="/admin.html">Admin console</a>
+          <a class="button primary" id="create-invoice-btn" href="/invoice.html">Create invoice</a>
+          <a class="button secondary" id="view-records-btn" href="#records">View records</a>
+          <a class="button ghost" id="scan-qr-btn" href="/pay.html">Scan QR</a>
         </div>
       </div>
       <div class="card quick-stats">
@@ -96,15 +76,43 @@
         </form>
         <button class="button ghost full" id="logout-btn" type="button">Logout</button>
       </div>
+    </section>
 
-      <div class="card">
-        <h2>Profile</h2>
-        <p class="muted small">Fetches using the access token (Authorization: Bearer).</p>
-        <button class="button secondary" id="me-btn" type="button">Get /api/auth/me</button>
-        <pre id="profile-output" class="output">No data yet.</pre>
+    <section class="card" id="records">
+      <div class="section-header">
+        <div>
+          <h2>Your balance over time</h2>
+          <p class="muted small">Built from your inbound/outbound transfers.</p>
+        </div>
+        <span class="badge muted" id="chart-range">No activity yet</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="balance-chart" width="900" height="280"></canvas>
       </div>
     </section>
 
+    <section class="card">
+      <div class="table-header">
+        <div>
+          <h2>Your transactions</h2>
+          <p class="muted small" id="txn-summary">Login to see your history.</p>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Direction</th>
+              <th>Counterparty</th>
+              <th>Amount</th>
+              <th>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody id="txn-table-body"></tbody>
+        </table>
+      </div>
+      <p id="txn-empty" class="muted small hidden">No transactions yet.</p>
+    </section>
     <section class="card">
       <h2>Latest event</h2>
       <p id="status" class="status muted">Waiting for your first action.</p>

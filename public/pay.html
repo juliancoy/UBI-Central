@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pay Invoice - UBI Central</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="navbar">
+    <a class="nav-logo" href="/">UBI Central</a>
+    <nav class="nav-links">
+      <a href="/">Auth</a>
+      <a href="/bio.html">Profile</a>
+      <a href="/admin.html">Admin</a>
+      <a href="/invoice.html">Invoices</a>
+    </nav>
+    <div id="nav-user" class="nav-user"></div>
+  </header>
+  <main class="page">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Invoice</p>
+        <h1 id="pay-title">Invoice</h1>
+        <p class="lede" id="pay-memo"></p>
+        <div class="pill-row">
+          <span class="pill accent" id="pay-amount"></span>
+          <span class="pill muted" id="pay-destination"></span>
+        </div>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="table-header">
+        <div>
+          <h2>Confirm payment</h2>
+          <p class="muted small">You will send this amount to the invoice destination.</p>
+        </div>
+      </div>
+      <div class="actions-row">
+        <button class="button secondary" id="confirm-pay" type="button">Confirm and send</button>
+        <p id="pay-status" class="muted small"></p>
+      </div>
+    </section>
+  </main>
+  <script src="nav.js"></script>
+  <script src="pay.js"></script>
+</body>
+</html>

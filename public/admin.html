@@ -43,6 +43,23 @@
     <section class="card">
       <div class="table-header">
         <div>
+          <h2>Admin actions</h2>
+          <p class="muted small">Run privileged operations against the C++ backend.</p>
+        </div>
+      </div>
+      <div class="actions-row">
+        <label for="grant-amount" class="muted small">Grant amount to all users</label>
+        <div class="actions-inline">
+          <input id="grant-amount" type="number" step="0.01" min="0" placeholder="e.g. 50" />
+          <button class="button secondary" id="grant-btn" type="button">Apply grant</button>
+        </div>
+        <p id="grant-status" class="muted small"></p>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="table-header">
+        <div>
           <h2>Registered users</h2>
           <p class="muted small">Data is fetched directly from the C++ backend via /api/admin/users.</p>
         </div>

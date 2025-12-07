@@ -13,7 +13,7 @@ require('dotenv').config();
 
 const app = express();
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-access-secret-change-me';
 const REFRESH_SECRET = process.env.REFRESH_SECRET || 'dev-refresh-secret-change-me';
 const ACCESS_EXPIRES_IN = process.env.ACCESS_EXPIRES_IN || '15m';
@@ -22,7 +22,7 @@ const CLIENT_BASE_URL = process.env.CLIENT_BASE_URL || `http://localhost:${PORT}
 const GOOGLE_ENABLED = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 const GITHUB_ENABLED = Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET);
 const SERVER_BASE_URL = process.env.SERVER_BASE_URL || CLIENT_BASE_URL;
-const CPP_BASE_URL = process.env.CPP_BASE_URL || 'http://localhost:4002';
+const CPP_BASE_URL = process.env.CPP_BASE_URL || 'http://ubi-backend-cpp:4002';
 const CPP_ADMIN_KEY = process.env.CPP_ADMIN_KEY || '';
 
 const dataDir = path.join(__dirname, 'data');
@@ -152,7 +152,7 @@ if (GOOGLE_ENABLED) {
         secure: false,
       });
       res.redirect(
-        `/?provider=google&accessToken=${encodeURIComponent(
+        `http://localhost:8080/?provider=google&accessToken=${encodeURIComponent(
           accessToken
         )}&refreshToken=${encodeURIComponent(refreshToken)}`
       );
@@ -220,7 +220,7 @@ if (GITHUB_ENABLED) {
         secure: false,
       });
       res.redirect(
-        `/?provider=github&accessToken=${encodeURIComponent(
+        `http://localhost:8080/?provider=github&accessToken=${encodeURIComponent(
           accessToken
         )}&refreshToken=${encodeURIComponent(refreshToken)}`
       );
@@ -338,6 +338,119 @@ app.get('/api/admin/users', authenticateJWT, async (req, res) => {
     res.json({ users: data });
   } catch (err) {
     console.error('Admin users fetch failed', err);
+    res.status(500).json({ message: 'Unable to reach C++ backend' });
+  }
+});
+
+async function fetchAdminUserDetail(req, res) {
+  const email = req.params.email;
+  try {
+    const headers = CPP_ADMIN_KEY ? { 'x-admin-key': CPP_ADMIN_KEY } : {};
+    const response = await fetch(`${CPP_BASE_URL}/admin/users/${encodeURIComponent(email)}`, {
+      headers,
+    });
+    if (response.status === 404) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (!response.ok) {
+      return res
+        .status(502)
+        .json({ message: 'Failed to fetch user details from C++ backend' });
+    }
+    const data = await response.json().catch(() => ({}));
+    res.json({ user: data });
+  } catch (err) {
+    console.error('Admin user detail fetch failed', err);
+    res.status(500).json({ message: 'Unable to reach C++ backend' });
+  }
+}
+
+app.get('/api/admin/users/:email', authenticateJWT, fetchAdminUserDetail);
+app.get('/api/admin/user/:email', authenticateJWT, fetchAdminUserDetail);
+
+app.post('/api/admin/clear', authenticateJWT, async (req, res) => {
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (CPP_ADMIN_KEY) {
+      headers['x-admin-key'] = CPP_ADMIN_KEY;
+    }
+    const response = await fetch(`${CPP_BASE_URL}/admin/clear`, {
+      method: 'POST',
+      headers,
+    });
+    if (!response.ok) {
+      return res.status(502).json({ message: 'Failed to clear data in C++ backend' });
+    }
+    const data = await response.json().catch(() => ({}));
+    res.json(data);
+  } catch (err) {
+    console.error('Admin clear failed', err);
+    res.status(500).json({ message: 'Unable to reach C++ backend' });
+  }
+});
+
+app.post('/api/admin/grant', authenticateJWT, async (req, res) => {
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (CPP_ADMIN_KEY) {
+      headers['x-admin-key'] = CPP_ADMIN_KEY;
+    }
+    const response = await fetch(`${CPP_BASE_URL}/admin/grant`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ amount: req.body?.amount }),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return res
+        .status(502)
+        .json({ message: data.message || 'Failed to grant funds in C++ backend' });
+    }
+    const data = await response.json().catch(() => ({}));
+    res.json(data);
+  } catch (err) {
+    console.error('Admin grant failed', err);
+    res.status(500).json({ message: 'Unable to reach C++ backend' });
+  }
+});
+
+app.post('/api/transfer', authenticateJWT, async (req, res) => {
+  try {
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: req.headers.authorization || '',
+    };
+    const response = await fetch(`${CPP_BASE_URL}/transfer`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(req.body || {}),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = data.message || 'Failed to record transfer';
+      return res.status(response.status).json({ message });
+    }
+    res.json(data);
+  } catch (err) {
+    console.error('Transfer proxy failed', err);
+    res.status(500).json({ message: 'Unable to reach C++ backend' });
+  }
+});
+
+app.get('/api/record', authenticateJWT, async (req, res) => {
+  try {
+    const headers = {
+      Authorization: req.headers.authorization || '',
+    };
+    const response = await fetch(`${CPP_BASE_URL}/record`, { headers });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = data.message || 'Failed to fetch record';
+      return res.status(response.status).json({ message });
+    }
+    res.json(data);
+  } catch (err) {
+    console.error('Record proxy failed', err);
     res.status(500).json({ message: 'Unable to reach C++ backend' });
   }
 });

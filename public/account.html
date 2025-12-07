@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account - UBI Central</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="navbar">
+    <a class="nav-logo" href="/">UBI Central</a>
+    <nav class="nav-links">
+      <a href="/">Auth</a>
+      <a href="/bio.html">Profile</a>
+      <a href="/admin.html">Admin</a>
+    </nav>
+    <div id="nav-user" class="nav-user"></div>
+  </header>
+  <main class="page">
+    <div class="breadcrumb"><a href="/admin.html">← Back to admin</a></div>
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Account</p>
+        <h1 id="account-name">Loading…</h1>
+        <p class="muted" id="account-email"></p>
+        <div class="pill-row">
+          <span class="pill muted" id="account-status-pill">Status: unknown</span>
+          <span class="pill accent" id="account-balance-pill">Balance: 0</span>
+        </div>
+      </div>
+      <div class="card quick-stats">
+        <p class="label">Totals</p>
+        <div class="stat">
+          <span class="stat-label">Inbound</span>
+          <span id="stat-inbound-total" class="stat-value">0</span>
+          <span class="stat-value muted" id="stat-inbound-count">0 transfers</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Outbound</span>
+          <span id="stat-outbound-total" class="stat-value">0</span>
+          <span class="stat-value muted" id="stat-outbound-count">0 transfers</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Net</span>
+          <span id="stat-net" class="stat-value">0</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="section-header">
+        <div>
+          <h2>Balance over time</h2>
+          <p class="muted small">Built from inbound/outbound records for this account.</p>
+        </div>
+        <span class="badge muted" id="chart-range">No activity yet</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="balance-chart" width="900" height="280"></canvas>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="table-header">
+        <div>
+          <h2>Transactions</h2>
+          <p class="muted small" id="txn-summary">All inbound and outbound transfers.</p>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Direction</th>
+              <th>Counterparty</th>
+              <th>Amount</th>
+              <th>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody id="txn-table-body"></tbody>
+        </table>
+      </div>
+      <p id="txn-empty" class="muted small hidden">No transactions recorded for this user yet.</p>
+    </section>
+
+    <p id="account-status-msg" class="status muted small">Loading account…</p>
+  </main>
+  <script src="nav.js"></script>
+  <script src="account.js"></script>
+</body>
+</html>

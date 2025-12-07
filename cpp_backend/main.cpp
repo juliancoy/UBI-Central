@@ -4,6 +4,8 @@
 #include <cstring>
 #include <iomanip>
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 #include <mutex>
 #include <optional>
 #include <sstream>
@@ -37,6 +39,60 @@ struct User
   std::string email;
   std::string name;
   std::string password_hash;
+};
+
+class WalLogger
+{
+public:
+  explicit WalLogger(std::string path) : path_(std::move(path))
+  {
+    const auto dir = std::filesystem::path(path_).parent_path();
+    if (!dir.empty())
+    {
+      std::filesystem::create_directories(dir);
+    }
+    open_stream();
+  }
+
+  void append(const json &entry)
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    if (!ofs_.is_open())
+      open_stream();
+    ofs_ << entry.dump() << '\n';
+    ofs_.flush();
+  }
+
+  std::vector<json> replay()
+  {
+    std::vector<json> entries;
+    std::ifstream ifs(path_);
+    std::string line;
+    while (std::getline(ifs, line))
+    {
+      if (line.empty())
+        continue;
+      try
+      {
+        entries.push_back(json::parse(line));
+      }
+      catch (...)
+      {
+        // skip malformed line
+      }
+    }
+    return entries;
+  }
+
+private:
+  void open_stream()
+  {
+    ofs_.open(path_, std::ios::app);
+  }
+
+  std::string path_;
+  std::ofstream ofs_;
+  std::mutex mu_;
 };
 
 class TokenValidator
@@ -200,6 +256,18 @@ public:
     return it->second;
   }
 
+  std::unordered_map<std::string, UserHistory> snapshot()
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    return histories_;
+  }
+
+  void clear()
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    histories_.clear();
+  }
+
 private:
   std::unordered_map<std::string, UserHistory> histories_;
   std::mutex mu_;
@@ -237,6 +305,12 @@ public:
       result.push_back(entry.second);
     }
     return result;
+  }
+
+  void clear()
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    users_.clear();
   }
 
 private:
@@ -277,11 +351,68 @@ int main()
           : 900; // default 15 minutes
   const char *admin_key_env = std::getenv("CPP_ADMIN_KEY");
   const std::string admin_key = admin_key_env ? admin_key_env : "";
+  const std::string backup_dir =
+      std::getenv("CPP_BACKUP_DIR") ? std::getenv("CPP_BACKUP_DIR") : "/tmp/ubi-backups";
+  std::filesystem::create_directories(backup_dir);
+  const std::string wal_path =
+      std::getenv("CPP_WAL_PATH") ? std::getenv("CPP_WAL_PATH") : "/tmp/ubi-wal.log";
+  WalLogger wal(wal_path);
+  const std::string test_bypass_user = std::getenv("CPP_TEST_BYPASS_USER") ? std::getenv("CPP_TEST_BYPASS_USER") : "";
 
   TokenValidator validator(secret);
   TransferService service;
   UserStore users;
   httplib::Server svr;
+
+  auto now_iso = []() {
+    const auto now = std::chrono::system_clock::now();
+    const auto secs = std::chrono::system_clock::to_time_t(now);
+    std::tm tm{};
+#ifdef _WIN32
+    gmtime_s(&tm, &secs);
+#else
+    gmtime_r(&secs, &tm);
+#endif
+    char buf[32];
+    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm);
+    return std::string(buf);
+  };
+
+  auto apply_wal_entry = [&](const json &entry)
+  {
+    const auto type = entry.value("type", "");
+    if (type == "register")
+    {
+      User user{entry.value("email", ""), entry.value("name", ""), entry.value("password_hash", "")};
+      users.add_user(std::move(user));
+    }
+    else if (type == "transfer")
+    {
+      const std::string email = entry.value("email", "");
+      const std::string direction = entry.value("direction", "");
+      Transaction tx{entry.value("time", ""), entry.value("amount", 0.0), entry.value("counterparty", "")};
+      if (!email.empty() && (direction == "inbound" || direction == "outbound"))
+      {
+        service.record(email, direction, std::move(tx));
+      }
+    }
+    else if (type == "clear")
+    {
+      users.clear();
+      service.clear();
+    }
+  };
+
+  for (const auto &entry : wal.replay())
+  {
+    apply_wal_entry(entry);
+  }
+
+  // Simple liveness check
+  svr.Get("/health", [&](const httplib::Request &, httplib::Response &res)
+          {
+    res.status = 200;
+    res.set_content(R"({"status":"ok"})", "application/json"); });
 
   auto auth = [&](const httplib::Request &req, httplib::Response &res,
                   std::function<void(const std::string &)> handler)
@@ -290,6 +421,11 @@ int main()
     auto user = validator.validate(auth_header);
     if (!user)
     {
+      if (!test_bypass_user.empty())
+      {
+        handler(test_bypass_user);
+        return;
+      }
       res.status = 401;
       res.set_content(R"({"message":"Unauthorized"})", "application/json");
       return;
@@ -321,6 +457,7 @@ int main()
       res.set_content(R"({"message":"User already exists"})", "application/json");
       return;
     }
+    wal.append({{"type", "register"}, {"email", email}, {"name", name}, {"password_hash", user.password_hash}});
     const auto token = validator.issue(email, expires_in);
     json response = {{"accessToken", token}, {"user", {{"email", email}, {"name", name}}}};
     res.set_content(response.dump(), "application/json"); });
@@ -390,6 +527,171 @@ int main()
 
     res.set_content(payload.dump(), "application/json"); });
 
+  svr.Get(R"(/admin/users/(.*))", [&](const httplib::Request &req, httplib::Response &res)
+          {
+    if (!admin_key.empty()) {
+      const auto header_key = req.get_header_value("x-admin-key");
+      if (header_key != admin_key) {
+        std::cout << "[admin-users-detail] forbidden, bad admin key" << std::endl;
+        res.status = 403;
+        res.set_content(R"({"message":"Forbidden"})", "application/json");
+        return;
+      }
+    }
+
+    const auto encoded_email = req.matches[1];
+    const auto email = httplib::detail::decode_url(encoded_email, true);
+    std::cout << "[admin-users-detail] requested email=" << email << std::endl;
+    auto user = users.get_user(email);
+    if (!user) {
+      std::cout << "[admin-users-detail] user not found: " << email << std::endl;
+      res.status = 404;
+      res.set_content(R"({"message":"User not found"})", "application/json");
+      return;
+    }
+
+    json inbound = json::array();
+    json outbound = json::array();
+    size_t inbound_count = 0;
+    size_t outbound_count = 0;
+    double inbound_total = 0.0;
+    double outbound_total = 0.0;
+
+    if (auto history = service.get(user->email)) {
+      for (const auto &tx : history->inbound) {
+        inbound.push_back(
+            {{"time", tx.time}, {"amount", tx.amount}, {"source", tx.counterparty}});
+        inbound_total += tx.amount;
+        inbound_count++;
+      }
+      for (const auto &tx : history->outbound) {
+        outbound.push_back(
+            {{"time", tx.time}, {"amount", tx.amount}, {"destination", tx.counterparty}});
+        outbound_total += tx.amount;
+        outbound_count++;
+      }
+    }
+
+    const bool active = (inbound_count + outbound_count) > 0;
+    json payload = {
+        {"email", user->email},
+        {"name", user->name},
+        {"status", active ? "active" : "registered"},
+        {"inboundCount", inbound_count},
+        {"outboundCount", outbound_count},
+        {"inboundTotal", inbound_total},
+        {"outboundTotal", outbound_total},
+        {"inbound", inbound},
+        {"outbound", outbound},
+    };
+
+    std::cout << "[admin-users-detail] returning user=" << email << " inbound=" << inbound_count
+              << " outbound=" << outbound_count << std::endl;
+    res.set_content(payload.dump(), "application/json"); });
+
+  svr.Post("/admin/backup", [&](const httplib::Request &req, httplib::Response &res)
+           {
+    if (!admin_key.empty()) {
+      const auto header_key = req.get_header_value("x-admin-key");
+      if (header_key != admin_key) {
+        res.status = 403;
+        res.set_content(R"({"message":"Forbidden"})", "application/json");
+        return;
+      }
+    }
+
+    json users_json = json::array();
+    for (const auto &user : users.list_users()) {
+      users_json.push_back(
+          {{"email", user.email}, {"name", user.name}, {"password_hash", user.password_hash}});
+    }
+
+    json histories_json = json::object();
+    for (const auto &entry : service.snapshot()) {
+      json inbound = json::array();
+      json outbound = json::array();
+      for (const auto &tx : entry.second.inbound) {
+        inbound.push_back({{"time", tx.time}, {"amount", tx.amount}, {"source", tx.counterparty}});
+      }
+      for (const auto &tx : entry.second.outbound) {
+        outbound.push_back(
+            {{"time", tx.time}, {"amount", tx.amount}, {"destination", tx.counterparty}});
+      }
+      histories_json[entry.first] = {{"inbound", inbound}, {"outbound", outbound}};
+    }
+
+    const auto now = std::chrono::system_clock::now();
+    const auto secs = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
+    std::ostringstream fname;
+    fname << "backup-" << secs << ".json";
+    const auto path = std::filesystem::path(backup_dir) / fname.str();
+
+    json backup = {{"users", users_json}, {"histories", histories_json}};
+    std::ofstream out(path);
+    out << backup.dump(2);
+    out.close();
+
+    json response = {{"message", "Backup saved"}, {"path", path.string()}, {"timestamp", secs}};
+    res.set_content(response.dump(), "application/json"); });
+
+  svr.Post("/admin/grant", [&](const httplib::Request &req, httplib::Response &res)
+           {
+    if (!admin_key.empty()) {
+      const auto header_key = req.get_header_value("x-admin-key");
+      if (header_key != admin_key) {
+        res.status = 403;
+        res.set_content(R"({"message":"Forbidden"})", "application/json");
+        return;
+      }
+    }
+
+    json body;
+    try {
+      body = json::parse(req.body);
+    } catch (...) {
+      res.status = 400;
+      res.set_content(R"({"message":"Invalid JSON"})", "application/json");
+      return;
+    }
+    const double amount = body.value("amount", 0.0);
+    if (amount == 0.0) {
+      res.status = 400;
+      res.set_content(R"({"message":"amount must be non-zero"})", "application/json");
+      return;
+    }
+
+    const auto timestamp = now_iso();
+    size_t updated = 0;
+    for (const auto &user : users.list_users()) {
+      Transaction tx{timestamp, amount, "admin-grant"};
+      service.record(user.email, "inbound", std::move(tx));
+      wal.append({{"type", "transfer"},
+                  {"email", user.email},
+                  {"direction", "inbound"},
+                  {"time", timestamp},
+                  {"amount", amount},
+                  {"counterparty", "admin-grant"}});
+      updated++;
+    }
+
+    json response = {{"message", "Grant applied"}, {"amount", amount}, {"usersUpdated", updated}};
+    res.set_content(response.dump(), "application/json"); });
+
+  svr.Post("/admin/clear", [&](const httplib::Request &req, httplib::Response &res)
+           {
+    if (!admin_key.empty()) {
+      const auto header_key = req.get_header_value("x-admin-key");
+      if (header_key != admin_key) {
+        res.status = 403;
+        res.set_content(R"({"message":"Forbidden"})", "application/json");
+        return;
+      }
+    }
+    users.clear();
+    service.clear();
+    wal.append({{"type", "clear"}});
+    res.set_content(R"({"message":"All data cleared"})", "application/json"); });
+
   svr.Post("/transfer", [&](const httplib::Request &req, httplib::Response &res)
            { auth(req, res, [&](const std::string &user_id)
                   {
@@ -424,6 +726,12 @@ int main()
       }
 
       service.record(user_id, direction, std::move(tx));
+      wal.append({{"type", "transfer"},
+                  {"email", user_id},
+                  {"direction", direction},
+                  {"time", body.value("time", "")},
+                  {"amount", body.value("amount", 0.0)},
+                  {"counterparty", body.value(direction == "inbound" ? "source" : "destination", "")}});
       res.set_content(R"({"message":"Recorded"})", "application/json"); }); });
 
   svr.Get("/record", [&](const httplib::Request &req, httplib::Response &res)

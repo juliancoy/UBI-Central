@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice QR - UBI Central</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="navbar">
+    <a class="nav-logo" href="/">UBI Central</a>
+    <nav class="nav-links">
+      <a href="/">Auth</a>
+      <a href="/bio.html">Profile</a>
+      <a href="/admin.html">Admin</a>
+      <a href="/invoice.html">Invoices</a>
+    </nav>
+    <div id="nav-user" class="nav-user"></div>
+  </header>
+  <main class="page">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Requests</p>
+        <h1>Generate invoice QR</h1>
+        <p class="lede">Create a scannable request for any amount. The payer will confirm before sending.</p>
+      </div>
+      <div class="card quick-stats">
+        <p class="label">Invoice link</p>
+        <p id="invoice-link" class="muted small wrap"></p>
+        <button class="button secondary" id="copy-link" type="button">Copy link</button>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="actions-row">
+        <label class="muted small" for="invoice-amount">Amount</label>
+        <input id="invoice-amount" type="number" min="0" step="0.01" placeholder="e.g. 42.50" />
+        <label class="muted small" for="invoice-memo">Memo (optional)</label>
+        <input id="invoice-memo" type="text" placeholder="What is this for?" />
+        <p id="invoice-status" class="muted small"></p>
+      </div>
+      <div class="qr-wrap">
+        <div id="qrcode"></div>
+      </div>
+    </section>
+  </main>
+  <script src="nav.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="invoice.js"></script>
+</body>
+</html>

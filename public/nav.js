@@ -41,11 +41,8 @@ function renderLoggedOut() {
   `;
   const loginBtn = document.getElementById('nav-login-btn');
   loginBtn?.addEventListener('click', () => {
-    if (window.showLoginModal) {
-      window.showLoginModal();
-    } else {
-      window.location.href = '/';
-    }
+    if (window.showLoginModal) window.showLoginModal();
+    else window.location.href = '/';
   });
 }
 
@@ -142,3 +139,46 @@ document.addEventListener('click', (event) => {
 
 syncTokens();
 loadProfile();
+
+// Inject OAuth modal if missing
+(() => {
+  if (document.getElementById('login-modal')) {
+    window.showLoginModal = () => document.getElementById('login-modal')?.classList.remove('hidden');
+    return;
+  }
+  const modal = document.createElement('div');
+  modal.innerHTML = `
+    <div id="login-modal" class="modal hidden">
+      <div class="modal-backdrop" id="modal-backdrop"></div>
+      <div class="modal-card">
+        <button class="modal-close" id="modal-close" aria-label="Close modal">×</button>
+        <p class="label">Single Sign-On</p>
+        <h2>Choose a provider</h2>
+        <div class="provider-row">
+          <a class="provider-btn google" href="/auth/google">
+            <span class="icon" aria-hidden="true">G</span>
+            <span>Continue with Google</span>
+          </a>
+          <a class="provider-btn github" href="/auth/github">
+            <span class="icon" aria-hidden="true">GH</span>
+            <span>Continue with GitHub</span>
+          </a>
+        </div>
+        <p class="muted small">Or use email/password on the home page.</p>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal.firstElementChild);
+  const modalEl = document.getElementById('login-modal');
+  const backdrop = document.getElementById('modal-backdrop');
+  const closeBtn = document.getElementById('modal-close');
+  function hideModal() {
+    modalEl.classList.add('hidden');
+  }
+  window.showLoginModal = () => modalEl.classList.remove('hidden');
+  backdrop?.addEventListener('click', hideModal);
+  closeBtn?.addEventListener('click', hideModal);
+  document.addEventListener('keyup', (e) => {
+    if (e.key === 'Escape') hideModal();
+  });
+})();
