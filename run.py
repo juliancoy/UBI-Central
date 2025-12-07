@@ -7,6 +7,14 @@ import docker
 ROOT = Path(__file__).resolve().parent
 
 
+def ensure_network(client: docker.DockerClient, name: str) -> str:
+  """Create network if it doesn't already exist."""
+  for net in client.networks.list(names=[name]):
+    return net.name
+  client.networks.create(name, driver="bridge")
+  return name
+
+
 def stop_containers(client: docker.DockerClient) -> None:
   for name in ("ubi-backend-cpp", "ubi-frontend"):
     try:
@@ -50,6 +58,7 @@ done
       },
       ports={f"{os.getenv('CPP_PORT', '4002')}/tcp": int(os.getenv("CPP_PORT", "4002"))},
       volumes={str(ROOT): {"bind": "/work", "mode": "rw"}},
+      network=os.getenv("UBI_NETWORK", "ubi-net"),
   )
 
 
@@ -67,9 +76,13 @@ PORT=${PORT:-3000} npm start
       name="ubi-frontend",
       detach=True,
       remove=True,
-      environment={"PORT": os.getenv("PORT", "3000")},
+      environment={
+          "PORT": os.getenv("PORT", "3000"),
+          "CPP_BASE_URL": os.getenv("CPP_BASE_URL", "http://ubi-backend-cpp:4002"),
+      },
       ports={f"{os.getenv('PORT', '3000')}/tcp": int(os.getenv("PORT", "3000"))},
       volumes={str(ROOT): {"bind": "/work", "mode": "rw"}},
+      network=os.getenv("UBI_NETWORK", "ubi-net"),
   )
 
 
@@ -80,6 +93,8 @@ if __name__ == "__main__":
   except Exception as exc:  # noqa: BLE001
     print(f"Docker is required and must be running: {exc}", file=sys.stderr)
     sys.exit(1)
+
+  network_name = ensure_network(client, os.getenv("UBI_NETWORK", "ubi-net"))
 
   stop_containers(client)
   start_backend(client)
