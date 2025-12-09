@@ -39,6 +39,7 @@ struct User
   std::string email;
   std::string name;
   std::string password_hash;
+  std::string created_at;
 };
 
 class WalLogger
@@ -383,7 +384,8 @@ int main()
     const auto type = entry.value("type", "");
     if (type == "register")
     {
-      User user{entry.value("email", ""), entry.value("name", ""), entry.value("password_hash", "")};
+      const auto created = entry.value("created_at", entry.value("createdAt", now_iso()));
+      User user{entry.value("email", ""), entry.value("name", ""), entry.value("password_hash", ""), created};
       users.add_user(std::move(user));
     }
     else if (type == "transfer")
@@ -451,15 +453,21 @@ int main()
       res.set_content(R"({"message":"email, name, password required"})", "application/json");
       return;
     }
-    User user{email, name, sha256_hex(password)};
+    const auto created_at = now_iso();
+    User user{email, name, sha256_hex(password), created_at};
     if (!users.add_user(user)) {
       res.status = 409;
       res.set_content(R"({"message":"User already exists"})", "application/json");
       return;
     }
-    wal.append({{"type", "register"}, {"email", email}, {"name", name}, {"password_hash", user.password_hash}});
+    wal.append({{"type", "register"},
+                {"email", email},
+                {"name", name},
+                {"password_hash", user.password_hash},
+                {"created_at", created_at}});
     const auto token = validator.issue(email, expires_in);
-    json response = {{"accessToken", token}, {"user", {{"email", email}, {"name", name}}}};
+    json response = {{"accessToken", token},
+                     {"user", {{"email", email}, {"name", name}, {"createdAt", created_at}}}};
     res.set_content(response.dump(), "application/json"); });
 
   svr.Post("/auth/login", [&](const httplib::Request &req, httplib::Response &res)
@@ -518,6 +526,8 @@ int main()
           {"email", user.email},
           {"name", user.name},
           {"status", active ? "active" : "registered"},
+          {"createdAt", user.created_at},
+          {"created_at", user.created_at},
           {"inboundCount", inbound_count},
           {"outboundCount", outbound_count},
           {"inboundTotal", inbound_total},
@@ -577,6 +587,8 @@ int main()
         {"email", user->email},
         {"name", user->name},
         {"status", active ? "active" : "registered"},
+        {"createdAt", user->created_at},
+        {"created_at", user->created_at},
         {"inboundCount", inbound_count},
         {"outboundCount", outbound_count},
         {"inboundTotal", inbound_total},
@@ -603,7 +615,10 @@ int main()
     json users_json = json::array();
     for (const auto &user : users.list_users()) {
       users_json.push_back(
-          {{"email", user.email}, {"name", user.name}, {"password_hash", user.password_hash}});
+          {{"email", user.email},
+           {"name", user.name},
+           {"password_hash", user.password_hash},
+           {"created_at", user.created_at}});
     }
 
     json histories_json = json::object();

@@ -124,6 +124,17 @@ function syncTokens(accessToken, refreshToken) {
   navState.refreshToken = refreshToken || localStorage.getItem('refreshToken') || '';
 }
 
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  if (window.__ubiSwRegistered) return;
+  window.__ubiSwRegistered = true;
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // ignore SW errors; app still functions online
+    });
+  });
+}
+
 document.addEventListener('auth:tokens-changed', (event) => {
   const detail = event.detail || {};
   syncTokens(detail.accessToken, detail.refreshToken);
@@ -182,3 +193,5 @@ loadProfile();
     if (e.key === 'Escape') hideModal();
   });
 })();
+
+registerServiceWorker();

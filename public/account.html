@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Account - UBI Central</title>
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -53,7 +56,16 @@
           <h2>Balance over time</h2>
           <p class="muted small">Built from inbound/outbound records for this account.</p>
         </div>
-        <span class="badge muted" id="chart-range">No activity yet</span>
+        <div class="chart-actions">
+          <div class="range-selector" id="chart-range-buttons">
+            <button type="button" class="range-btn" data-range="5Y">5Y</button>
+            <button type="button" class="range-btn" data-range="3Y">3Y</button>
+            <button type="button" class="range-btn" data-range="1Y">1Y</button>
+            <button type="button" class="range-btn" data-range="6M">6M</button>
+            <button type="button" class="range-btn" data-range="1M">1M</button>
+          </div>
+          <span class="badge muted" id="chart-range">No activity yet</span>
+        </div>
       </div>
       <div class="chart-wrap">
         <canvas id="balance-chart" width="900" height="280"></canvas>

@@ -1,7 +1,18 @@
 const pageState = {
   accessToken: localStorage.getItem('accessToken') || '',
   email: new URLSearchParams(window.location.search).get('email') || '',
+  selectedRange: '1Y',
+  dailySeries: [],
+  accountStart: null,
 };
+
+const RANGE_OPTIONS = [
+  { key: '5Y', label: '5Y', days: 365 * 5 },
+  { key: '3Y', label: '3Y', days: 365 * 3 },
+  { key: '1Y', label: '1Y', days: 365 },
+  { key: '6M', label: '6M', days: 30 * 6 },
+  { key: '1M', label: '1M', days: 30 },
+];
 
 const nameEl = document.getElementById('account-name');
 const emailEl = document.getElementById('account-email');
@@ -18,6 +29,7 @@ const txnSummary = document.getElementById('txn-summary');
 const txnTable = document.getElementById('txn-table-body');
 const txnEmpty = document.getElementById('txn-empty');
 const chartEl = document.getElementById('balance-chart');
+const rangeButtons = document.getElementById('chart-range-buttons');
 
 function syncTokens(detail = {}) {
   pageState.accessToken = detail.accessToken || localStorage.getItem('accessToken') || '';
@@ -44,6 +56,13 @@ function formatDate(value) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value || '—';
   return `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
+}
+
+function startOfDay(value) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
 async function api(path) {
@@ -84,37 +103,110 @@ function mergeTransactions(user) {
   return items;
 }
 
-function renderChart(canvas, txns) {
+function inferAccountStart(user, txns) {
+  const created = [
+    user.createdAt,
+    user.created_at,
+    user.created,
+    user.created_on,
+  ]
+    .map(startOfDay)
+    .filter(Boolean)
+    .map((d) => d.getTime());
+
+  const txnStarts = txns
+    .map((t) => startOfDay(t.time))
+    .filter(Boolean)
+    .map((d) => d.getTime());
+
+  const earliest = [...created, ...txnStarts];
+  if (!earliest.length) return startOfDay(new Date());
+  return startOfDay(Math.min(...earliest));
+}
+
+function buildDailyBalances(txns, startDate) {
+  const today = startOfDay(new Date());
+  const inferredStart = startOfDay(startDate || new Date()) || today;
+  const start = inferredStart > today ? today : inferredStart;
+  const sorted = [...txns].sort(
+    (a, b) => new Date(a.time).getTime() - new Date(b.time).getTime()
+  );
+  let balance = 0;
+  let idx = 0;
+  const series = [];
+
+  for (let cursor = new Date(start); cursor <= today; cursor.setDate(cursor.getDate() + 1)) {
+    const dayEnd = new Date(cursor);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    while (idx < sorted.length) {
+      const txTime = new Date(sorted[idx].time);
+      if (Number.isNaN(txTime.getTime()) || txTime > dayEnd) break;
+      balance += sorted[idx].delta;
+      idx += 1;
+    }
+
+    series.push({ date: new Date(cursor), balance });
+  }
+
+  return series;
+}
+
+function filterSeriesForRange(series, rangeKey) {
+  const option = RANGE_OPTIONS.find((opt) => opt.key === rangeKey);
+  if (!option || !option.days) return series;
+  const today = startOfDay(new Date());
+  const cutoff = startOfDay(new Date(today));
+  cutoff.setDate(cutoff.getDate() - option.days + 1);
+  return series.filter((point) => point.date >= cutoff);
+}
+
+function updateRangeBadge(series) {
+  if (!chartRangeEl) return;
+  if (!series.length) {
+    chartRangeEl.textContent = 'No activity yet';
+    chartRangeEl.className = 'badge muted';
+    return;
+  }
+  const first = series[0].date;
+  const last = series[series.length - 1].date;
+  chartRangeEl.textContent = `${first.toLocaleDateString()} → ${last.toLocaleDateString()}`;
+  chartRangeEl.className = 'badge success';
+}
+
+function renderRangeButtons() {
+  if (!rangeButtons) return;
+  const buttons = Array.from(rangeButtons.querySelectorAll('.range-btn'));
+  buttons.forEach((btn) => {
+    const key = btn.dataset.range;
+    btn.classList.toggle('active', key === pageState.selectedRange);
+    btn.onclick = () => {
+      pageState.selectedRange = key;
+      refreshChart();
+      renderRangeButtons();
+    };
+  });
+}
+
+function renderBarChart(canvas, series) {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const width = canvas.width;
   const height = canvas.height;
   ctx.clearRect(0, 0, width, height);
 
-  if (!txns.length) {
+  if (!series.length) {
     ctx.fillStyle = '#9ca3af';
     ctx.font = '14px Inter, system-ui, sans-serif';
     ctx.fillText('No activity yet', 20, height / 2);
     return;
   }
 
-  const times = txns.map((t) => new Date(t.time).getTime());
-  const deltas = txns.map((t) => t.delta);
-
-  const points = [];
-  let balance = 0;
-  for (let i = 0; i < txns.length; i += 1) {
-    balance += deltas[i];
-    points.push({ time: times[i], balance });
-  }
-
-  const minTime = Math.min(...times);
-  const maxTime = Math.max(...times);
-  const minBal = Math.min(0, ...points.map((p) => p.balance));
-  const maxBal = Math.max(0, ...points.map((p) => p.balance));
+  const balances = series.map((p) => p.balance);
+  const minBal = Math.min(0, ...balances);
+  const maxBal = Math.max(0, ...balances);
   const yRange = maxBal - minBal || 1;
-  const xRange = maxTime - minTime || 1;
-  const pad = 24;
+  const pad = 28;
   const plotW = width - pad * 2;
   const plotH = height - pad * 2;
 
@@ -137,22 +229,34 @@ function renderChart(canvas, txns) {
     ctx.stroke();
   }
 
-  ctx.beginPath();
-  points.forEach((p, idx) => {
-    const x = pad + ((p.time - minTime) / xRange) * plotW;
-    const y = pad + plotH - ((p.balance - minBal) / yRange) * plotH;
-    if (idx === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.strokeStyle = '#46c8a0';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  const zeroY = pad + plotH - ((0 - minBal) / yRange) * plotH;
+  const step = plotW / series.length;
+  const barW = Math.max(1, step * 0.7);
+  const offset = (step - barW) / 2;
 
-  ctx.lineTo(pad + plotW, pad + plotH);
-  ctx.lineTo(pad, pad + plotH);
-  ctx.closePath();
-  ctx.fillStyle = 'rgba(70, 200, 160, 0.12)';
-  ctx.fill();
+  series.forEach((point, idx) => {
+    const valueY = pad + plotH - ((point.balance - minBal) / yRange) * plotH;
+    const y = Math.min(zeroY, valueY);
+    const h = Math.max(2, Math.abs(zeroY - valueY));
+    const x = pad + idx * step + offset;
+    ctx.fillStyle = point.balance >= 0 ? 'rgba(70, 200, 160, 0.8)' : 'rgba(248, 113, 113, 0.8)';
+    ctx.fillRect(x, y, barW, h);
+  });
+
+  // simple axis labels
+  ctx.fillStyle = '#9ca3af';
+  ctx.font = '11px Inter, system-ui, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(series[0].date.toLocaleDateString(), pad, height - 6);
+  ctx.textAlign = 'right';
+  ctx.fillText(series[series.length - 1].date.toLocaleDateString(), width - pad, height - 6);
+  ctx.textAlign = 'left';
+}
+
+function refreshChart() {
+  const filtered = filterSeriesForRange(pageState.dailySeries || [], pageState.selectedRange);
+  renderBarChart(chartEl, filtered);
+  updateRangeBadge(filtered);
 }
 
 function renderTransactions(txns) {
@@ -191,20 +295,16 @@ function renderAccount(user) {
 
   const txns = mergeTransactions(user);
   renderTransactions(txns);
+  pageState.accountStart = inferAccountStart(user, txns);
+  pageState.dailySeries = buildDailyBalances(txns, pageState.accountStart);
+  renderRangeButtons();
+  refreshChart();
+
   if (txns.length) {
-    const first = new Date(txns[0].time);
-    const last = new Date(txns[txns.length - 1].time);
-    if (!Number.isNaN(first) && !Number.isNaN(last)) {
-      chartRangeEl.textContent = `${first.toLocaleDateString()} → ${last.toLocaleDateString()}`;
-      chartRangeEl.className = 'badge success';
-    }
     txnSummary.textContent = `${txns.length} transaction${txns.length === 1 ? '' : 's'} recorded.`;
   } else {
-    chartRangeEl.textContent = 'No activity yet';
-    chartRangeEl.className = 'badge muted';
     txnSummary.textContent = 'No transfers yet.';
   }
-  renderChart(chartEl, txns);
 }
 
 async function loadAccount() {

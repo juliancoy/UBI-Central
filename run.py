@@ -6,6 +6,18 @@ import docker
 
 ROOT = Path(__file__).resolve().parent
 
+DEFAULT_BACKEND_REPLICAS = 4
+
+
+def int_from_env(key: str, default: int) -> int:
+  raw = os.getenv(key)
+  if raw is None:
+    return default
+  try:
+    return int(raw)
+  except ValueError:
+    return default
+
 
 def ensure_network(client: docker.DockerClient, name: str) -> str:
   """Create network if it doesn't already exist."""
@@ -16,7 +28,9 @@ def ensure_network(client: docker.DockerClient, name: str) -> str:
 
 
 def stop_containers(client: docker.DockerClient) -> None:
-  for name in ("ubi-backend-cpp", "ubi-frontend", "ubi-proxy"):
+  for container in client.containers.list(all=True, filters={"name": "ubi-backend-cpp"}):
+    container.remove(force=True)
+  for name in ("ubi-frontend", "ubi-proxy"):
     try:
       container = client.containers.get(name)
       container.remove(force=True)
@@ -24,7 +38,58 @@ def stop_containers(client: docker.DockerClient) -> None:
       continue
 
 
-def start_backend(client: docker.DockerClient) -> None:
+def backend_replicas() -> int:
+  replicas = int_from_env("CPP_BACKEND_REPLICAS", DEFAULT_BACKEND_REPLICAS)
+  # keep things sane; a handful of replicas is enough for local dev
+  return min(max(replicas, 1), 10)
+
+
+def generate_nginx_config(instances: list[tuple[str, int]]) -> Path:
+  upstream_entries = "\n".join(f"    server {name}:{port};" for name, port in instances)
+  config = f"""events {{}}
+
+http {{
+  access_log /dev/stdout;
+  error_log /dev/stderr info;
+
+  upstream node_app {{
+    server ubi-frontend:3000;
+  }}
+
+  upstream cpp_app {{
+{upstream_entries}
+  }}
+
+  server {{
+    listen 80;
+    server_name _;
+    client_max_body_size 10m;
+
+    location /cpp/ {{
+      rewrite ^/cpp(/.*)$ $1 break;
+      proxy_pass http://cpp_app;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+    }}
+
+    location / {{
+      proxy_pass http://node_app;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+    }}
+  }}
+}}
+"""
+  generated = ROOT / ".nginx.generated.conf"
+  generated.write_text(config)
+  return generated
+
+
+def start_backend(client: docker.DockerClient, name: str, port: int) -> None:
   backend_cmd = r"""
 apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq g++ libssl-dev inotify-tools curl
@@ -50,19 +115,19 @@ done
   client.containers.run(
       "ubuntu:24.04",
       ["bash", "-lc", backend_cmd],
-      name="ubi-backend-cpp",
+      name=name,
       detach=True,
       remove=True,
       environment={
           "JWT_SECRET": os.getenv("JWT_SECRET", "dev-secret"),
-          "CPP_PORT": os.getenv("CPP_PORT", "4002"),
+          "CPP_PORT": str(port),
           "CPP_ADMIN_KEY": os.getenv("CPP_ADMIN_KEY", ""),
           "CPP_BACKUP_DIR": os.getenv("CPP_BACKUP_DIR", "/tmp/ubi-backups"),
           "CPP_WAL_PATH": os.getenv("CPP_WAL_PATH", "/tmp/ubi-wal.log"),
           "CPP_TEST_BYPASS_USER": os.getenv("CPP_TEST_BYPASS_USER", "loadtest-user"),
       },
       volumes={str(ROOT): {"bind": "/work", "mode": "rw"}},
-      ports={f"{os.getenv('CPP_PORT', '4002')}/tcp": int(os.getenv("CPP_PORT", "4002"))},
+      ports={f"{port}/tcp": port},
       network=os.getenv("UBI_NETWORK", "ubi-net"),
   )
 
@@ -83,13 +148,14 @@ PORT=${PORT:-3000} npm start
       remove=True,
       environment={
           "PORT": os.getenv("PORT", "3000"),
-          "CPP_BASE_URL": os.getenv("CPP_BASE_URL", "http://ubi-backend-cpp:4002"),
+          "CPP_BASE_URL": os.getenv("CPP_BASE_URL", "http://ubi-proxy/cpp"),
       },
       volumes={str(ROOT): {"bind": "/work", "mode": "rw"}},
       network=os.getenv("UBI_NETWORK", "ubi-net"),
   )
 
-def start_proxy(client: docker.DockerClient) -> None:
+
+def start_proxy(client: docker.DockerClient, nginx_conf_path: Path) -> None:
   proxy_cmd = r"""
 nginx -g 'daemon off;'
 """
@@ -101,7 +167,7 @@ nginx -g 'daemon off;'
       remove=True,
       ports={"80/tcp": int(os.getenv("PROXY_PORT", "8080"))},
       volumes={
-          str(ROOT / "nginx.conf"): {"bind": "/etc/nginx/nginx.conf", "mode": "ro"},
+          str(nginx_conf_path): {"bind": "/etc/nginx/nginx.conf", "mode": "ro"},
       },
       network=os.getenv("UBI_NETWORK", "ubi-net"),
   )
@@ -115,9 +181,15 @@ if __name__ == "__main__":
     sys.exit(1)
 
   network_name = ensure_network(client, os.getenv("UBI_NETWORK", "ubi-net"))
+  base_port = int_from_env("CPP_PORT", 4002)
+  replicas = backend_replicas()
+  backend_instances = [(f"ubi-backend-cpp-{i+1}", base_port + i) for i in range(replicas)]
 
   stop_containers(client)
-  start_backend(client)
+  for name, port in backend_instances:
+    start_backend(client, name, port)
+
   start_frontend(client)
-  start_proxy(client)
+  nginx_conf_path = generate_nginx_config(backend_instances)
+  start_proxy(client, nginx_conf_path)
   print("Proxy: http://localhost:8080  (services only available via proxy)")

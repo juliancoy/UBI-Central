@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="UBI Central icon">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#46c8a0"/>
+      <stop offset="100%" stop-color="#7a6bff"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="#0f172a"/>
+  <rect x="60" y="60" width="392" height="392" rx="96" fill="url(#g)" opacity="0.2"/>
+  <path d="M160 200c0-26.5 21.5-48 48-48h96c26.5 0 48 21.5 48 48v48c0 26.5-21.5 48-48 48h-80l-40 40v-88c-14.8 0-24-10.7-24-24v-24Z" fill="url(#g)"/>
+  <circle cx="208" cy="224" r="18" fill="#0f172a" opacity="0.8"/>
+  <circle cx="256" cy="224" r="18" fill="#0f172a" opacity="0.8"/>
+  <circle cx="304" cy="224" r="18" fill="#0f172a" opacity="0.8"/>
+</svg>

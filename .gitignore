@@ -3,3 +3,4 @@ __pycache__/
 node_modules/
 data/
 package-lock.json
+.nginx.generated.conf

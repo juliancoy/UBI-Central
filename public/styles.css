@@ -546,6 +546,46 @@ input:focus {
   gap: 12px;
 }
 
+.chart-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.range-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  background: #0b1220;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.range-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.range-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.range-btn.active {
+  background: rgba(70, 200, 160, 0.14);
+  color: var(--accent);
+  border-color: rgba(70, 200, 160, 0.35);
+}
+
 .chart-wrap {
   margin-top: 12px;
   background: #0b1220;
